@@ -123,6 +123,8 @@ Describe 'Open-NSPOutputFolder' {
         $script:SavedNoExplorer = $env:NSP_NO_EXPLORER
         $env:NSP_NO_EXPLORER = $null
         Mock -ModuleName NSP.NPS Start-Process { }
+        Mock -ModuleName NSP.NPS Get-NSPDesktopUserSid { 'S-1-5-21-1-2-3-1001' }
+        Mock -ModuleName NSP.NPS Grant-NSPFolderRead { }
         $script:Dir = Join-Path $TestDrive ('out_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $Dir | Out-Null
         $script:File = Join-Path $Dir 'Contoso_NPS_Response.json'
@@ -130,8 +132,9 @@ Describe 'Open-NSPOutputFolder' {
     }
     AfterEach { $env:NSP_NO_EXPLORER = $script:SavedNoExplorer }
 
-    It 'opens Explorer on the folder the hand-back file is in' {
+    It 'gives the desktop user read access, then opens Explorer on the hand-back folder' {
         InModuleScope NSP.NPS -Parameters @{ F = $File } { param($F) Open-NSPOutputFolder -Path $F }
+        Should -Invoke -ModuleName NSP.NPS Grant-NSPFolderRead -Times 1 -Exactly -ParameterFilter { $Path -eq $Dir -and $Sid -eq 'S-1-5-21-1-2-3-1001' }
         Should -Invoke -ModuleName NSP.NPS Start-Process -Times 1 -Exactly -ParameterFilter {
             $FilePath -eq 'explorer.exe' -and "$ArgumentList" -eq ('"{0}"' -f $Dir)
         }
@@ -144,5 +147,24 @@ Describe 'Open-NSPOutputFolder' {
         $env:NSP_NO_EXPLORER = '1'
         InModuleScope NSP.NPS -Parameters @{ F = $File } { param($F) Open-NSPOutputFolder -Path $F }
         Should -Invoke -ModuleName NSP.NPS Start-Process -Times 0
+    }
+}
+
+Describe 'Grant-NSPFolderRead' {
+    It 'adds one read-only, inherited entry for that account (real ACL on a TestDrive folder)' {
+        $dir = Join-Path $TestDrive ('acl_' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir | Out-Null
+        $me = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        InModuleScope NSP.NPS -Parameters @{ D = $dir; S = $me } { param($D, $S) Grant-NSPFolderRead -Path $D -Sid $S }
+        $ace = @((Get-Acl -LiteralPath $dir).Access | Where-Object { -not $_.IsInherited -and $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq $me })
+        $ace.Count | Should -Be 1
+        "$($ace[0].FileSystemRights)" | Should -Match 'ReadAndExecute'
+        "$($ace[0].FileSystemRights)" | Should -Not -Match 'Write|Modify|FullControl'
+        "$($ace[0].InheritanceFlags)" | Should -Match 'ObjectInherit'
+    }
+    It 'warns instead of throwing when the folder is missing' {
+        Mock -ModuleName NSP.NPS Write-Warning { }
+        { InModuleScope NSP.NPS { Grant-NSPFolderRead -Path (Join-Path $TestDrive 'nope') -Sid 'S-1-5-18' } } | Should -Not -Throw
+        Should -Invoke -ModuleName NSP.NPS Write-Warning -Times 1
     }
 }
