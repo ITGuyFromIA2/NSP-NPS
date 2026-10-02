@@ -117,3 +117,32 @@ Describe 'NSP.NPS' {
         }
     }
 }
+
+Describe 'Open-NSPOutputFolder' {
+    BeforeEach {
+        $script:SavedNoExplorer = $env:NSP_NO_EXPLORER
+        $env:NSP_NO_EXPLORER = $null
+        Mock -ModuleName NSP.NPS Start-Process { }
+        $script:Dir = Join-Path $TestDrive ('out_' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $Dir | Out-Null
+        $script:File = Join-Path $Dir 'Contoso_NPS_Response.json'
+        '{}' | Set-Content -LiteralPath $File
+    }
+    AfterEach { $env:NSP_NO_EXPLORER = $script:SavedNoExplorer }
+
+    It 'opens Explorer on the folder the hand-back file is in' {
+        InModuleScope NSP.NPS -Parameters @{ F = $File } { param($F) Open-NSPOutputFolder -Path $F }
+        Should -Invoke -ModuleName NSP.NPS Start-Process -Times 1 -Exactly -ParameterFilter {
+            $FilePath -eq 'explorer.exe' -and "$ArgumentList" -eq ('"{0}"' -f $Dir)
+        }
+    }
+    It 'does nothing for a folder that was never written (dry run)' {
+        InModuleScope NSP.NPS -Parameters @{ F = (Join-Path $TestDrive 'missing\x.json') } { param($F) Open-NSPOutputFolder -Path $F }
+        Should -Invoke -ModuleName NSP.NPS Start-Process -Times 0
+    }
+    It 'does nothing with NSP_NO_EXPLORER=1' {
+        $env:NSP_NO_EXPLORER = '1'
+        InModuleScope NSP.NPS -Parameters @{ F = $File } { param($F) Open-NSPOutputFolder -Path $F }
+        Should -Invoke -ModuleName NSP.NPS Start-Process -Times 0
+    }
+}

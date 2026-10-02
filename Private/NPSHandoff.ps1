@@ -234,5 +234,10 @@ function Invoke-NPSMenuHandoff {
     Write-Host ""
     Write-Host "Copy this one file to the Orchestrator machine, into Staging\<Abbrev>\Inbox\, then run" -ForegroundColor Cyan
     Write-Host "Resume Point D. Re-run this menu whenever the NPS policies change." -ForegroundColor Cyan
+    # NSP.NPS: open the folder for the tech to copy the file from.
+    if (Get-Command Open-NSPOutputFolder -ErrorAction SilentlyContinue) {
+        Write-Host "Opening the folder in Explorer (accept the access prompt if one appears)." -ForegroundColor Gray
+        Open-NSPOutputFolder -Path $path
+    }
     Read-Host "Press Enter to return to the menu" | Out-Null
 }

@@ -12,6 +12,7 @@ param([switch]$CurrentEditionOnly)
 
 # Tests never install sibling modules from the Gallery (inherited by both child test runs).
 $env:NSP_NO_AUTOINSTALL = '1'
+$env:NSP_NO_EXPLORER = '1'
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
