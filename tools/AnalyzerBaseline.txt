@@ -1,0 +1,9 @@
+# Not linted yet: moved verbatim from the zip-era tool (lint when split one function per file).
+Tests\Legacy\*
+Private\Dashboard.ps1
+Private\NPSCore.ps1
+Private\NPSExtension.ps1
+Private\NPSHandoff.ps1
+Private\NPSInteractive.ps1
+Private\NPSTroubleshooting.ps1
+Private\OrchestratorImport.ps1
